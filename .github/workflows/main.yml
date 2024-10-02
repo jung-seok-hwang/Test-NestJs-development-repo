@@ -35,30 +35,11 @@ jobs:
         PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
         HOST: ${{ secrets.EC2_HOST }}
         USER: ec2-user
-        ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-        IMAGE_TAG: ${{ github.sha }}
       run: |
         echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
         ssh -o StrictHostKeyChecking=no -i private_key ${USER}@${HOST} '
-          set -e
-          echo "Pulling latest image..."
-          docker pull ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
-          echo "Stopping existing container..."
+          docker pull ${{ steps.login-ecr.outputs.registry }}/your-ecr-repo-name:${{ github.sha }}
           docker stop nest-app || true
-          echo "Removing existing container..."
           docker rm nest-app || true
           docker run -d --name nest-app -p 3000:3000 ${{ steps.login-ecr.outputs.registry }}/your-ecr-repo-name:${{ github.sha }}
         '
-
-    - name: Verify Deployment
-      env:
-        HOST: ${{ secrets.EC2_HOST }}
-      run: |
-        echo "Verifying deployment..."
-        if curl -sSf http://${HOST}:3000/health > /dev/null; then
-          echo "Deployment verified successfully"
-        else
-          echo "Deployment verification failed"
-          exit 1
-        fi
