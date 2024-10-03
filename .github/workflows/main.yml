@@ -37,11 +37,10 @@ jobs:
           HOST: ${{ secrets.EC2_HOST }}
           USER: ec2-user
         run: |
-          echo "$PRIVATE_KEY" > private_key
-          chmod 600 private_key
-          ssh -o StrictHostKeyChecking=no -i private_key ${USER}@${HOST} << EOF
-            docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
+          ssh -o StrictHostKeyChecking=no -i private_key ${USER}@${HOST} << 'EOF'
+            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
             docker stop nest-app || true
             docker rm nest-app || true
-            docker run -d --name nest-app -p 3000:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
-          EOF
+            docker run -d --name nest-app -p 3000:3000 $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
+EOF
