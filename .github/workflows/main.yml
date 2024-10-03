@@ -1,4 +1,4 @@
-name: Deploy NestJS Docker App to AWS EC2
+name: Deploy to Amazon ECR and EC2
 
 on:
   push:
@@ -10,35 +10,63 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+    - uses: actions/checkout@v2
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-2
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ap-northeast-2
 
-      - name: Build and push Docker image
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        run: |
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-          docker build -t hwangjungseok/nestjs-bapull:latest .
-          docker push hwangjungseok/nestjs-bapull:latest
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Debug SSH Connection
-        env:
-          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ec2-user
-        run: |
-          echo "$EC2_SSH_PRIVATE_KEY" > private_key
-          chmod 400 private_key
-          ssh -o StrictHostKeyChecking=no -i private_key ${EC2_USER}@${EC2_HOST} '
-            docker pull hwangjungseok/nestjs-bapull:latest
-            docker stop nest-app || true
-            docker rm nest-app || true
-            docker run -d --name nest-app -p 3000:3000 hwangjungseok/nestjs-bapull:latest
-          '
+    - name: Build, tag, and push image to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    - name: Debug SSH Connection
+      env:
+        EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        EC2_HOST: ${{ secrets.EC2_HOST }}
+        EC2_USER: ec2-user
+      run: |
+        echo "Debugging information:"
+        echo "EC2_USER: $EC2_USER"
+        echo "EC2_HOST: $EC2_HOST"
+        echo "Attempting to resolve hostname:"
+        nslookup $EC2_HOST || echo "nslookup failed"
+        echo "Attempting to ping host:"
+        ping -c 4 $EC2_HOST || echo "ping failed"
+        echo "Setting up SSH key:"
+        echo "$EC2_SSH_PRIVATE_KEY" > private_key
+        chmod 600 private_key
+        echo "Attempting SSH connection with verbose output:"
+        ssh -v -o StrictHostKeyChecking=no -i private_key ${EC2_USER}@${EC2_HOST} "echo SSH connection successful" || echo "SSH connection failed"
+
+    - name: Deploy to EC2
+      env:
+        EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        EC2_HOST: ${{ secrets.EC2_HOST }}
+        EC2_USER: ec2-user
+        ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        echo "$EC2_SSH_PRIVATE_KEY" > private_key
+        chmod 600 private_key
+        ssh -o StrictHostKeyChecking=no -i private_key ${EC2_USER}@${EC2_HOST} '
+          aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+          docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          docker stop nest-app || true
+          docker rm nest-app || true
+          docker run -d --name nest-app -p 3000:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          docker image prune -f
+        '
