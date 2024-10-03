@@ -19,34 +19,26 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Build, tag, and push image to Amazon ECR
+      - name: Build and push Docker image
         env:
-          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-          IMAGE_TAG: ${{ github.sha }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+          docker build -t hwangjungseok/nestjs-bapull:latest .
+          docker push hwangjungseok/nestjs-bapull:latest
 
-      - name: Debug SSH Connection
+      - name: Deploy to EC2
         env:
           EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ec2-user
         run: |
-          echo "Debugging information:"
-          echo "EC2_USER: $EC2_USER"
-          echo "EC2_HOST: $EC2_HOST"
-          echo "Attempting to resolve hostname:"
-          nslookup $EC2_HOST || echo "nslookup failed"
-          echo "Attempting to ping host:"
-          ping -c 4 $EC2_HOST || echo "ping failed"
-          echo "Setting up SSH key:"
           echo "$EC2_SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
-          echo "Attempting SSH connection with verbose output:"
-          ssh -v -o StrictHostKeyChecking=no -i private_key ${EC2_USER}@${EC2_HOST} "echo SSH connection successful" || echo "SSH connection failed"
+          ssh -o StrictHostKeyChecking=no -i private_key ${EC2_USER}@${EC2_HOST} '
+            docker pull hwangjungseok/nestjs-bapull:latest
+            docker stop nest-app || true
+            docker rm nest-app || true
+            docker run -d --name nest-app -p 3000:3000 hwangjungseok/nestjs-bapull:latest
+          '
