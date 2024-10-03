@@ -32,17 +32,21 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Deploy to EC2
+      - name: Debug SSH Connection
         env:
           EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ec2-user
         run: |
+          echo "Debugging information:"
+          echo "EC2_USER: $EC2_USER"
+          echo "EC2_HOST: $EC2_HOST"
+          echo "Attempting to resolve hostname:"
+          nslookup $EC2_HOST || echo "nslookup failed"
+          echo "Attempting to ping host:"
+          ping -c 4 $EC2_HOST || echo "ping failed"
+          echo "Setting up SSH key:"
           echo "$EC2_SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
-          ssh -o StrictHostKeyChecking=no -i private_key ${EC2_USER}@${EC2_HOST} << EOF
-            docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
-            docker stop nest-app || true
-            docker rm nest-app || true
-            docker run -d --name nest-app -p 3000:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
-          EOF
+          echo "Attempting SSH connection with verbose output:"
+          ssh -v -o StrictHostKeyChecking=no -i private_key ${EC2_USER}@${EC2_HOST} "echo SSH connection successful" || echo "SSH connection failed"
