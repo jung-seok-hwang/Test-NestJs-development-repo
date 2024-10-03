@@ -69,5 +69,3 @@ jobs:
           docker image prune -f
           sudo systemctl enable docker
         '
-
-Version 2 of 2
