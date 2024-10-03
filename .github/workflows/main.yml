@@ -28,7 +28,7 @@ jobs:
           docker build -t hwangjungseok/nestjs-bapull:latest .
           docker push hwangjungseok/nestjs-bapull:latest
 
-      - name: Deploy to EC2
+      - name: Debug SSH Connection
         env:
           EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
