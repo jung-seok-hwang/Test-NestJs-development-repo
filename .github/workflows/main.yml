@@ -32,11 +32,34 @@ jobs:
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
+    - name: Create appspec.yml
+      run: |
+        cat > appspec.yml << EOL
+        version: 0.0
+        os: linux
+        files:
+          - source: /
+            destination: /var/www/nest-app
+        hooks:
+          BeforeInstall:
+            - location: scripts/stop_server.sh
+              timeout: 300
+              runas: root
+          AfterInstall:
+            - location: scripts/install_dependencies.sh
+              timeout: 300
+              runas: root
+          ApplicationStart:
+            - location: scripts/start_server.sh
+              timeout: 300
+              runas: root
+        EOL
+
     - name: Create deployment package
       run: |
         mkdir -p deploy_package
         cp appspec.yml deploy_package/
-        cp dockercompose.yml deploy_package/
+        cp docker-compose.yml deploy_package/
         mkdir -p deploy_package/scripts
         cp scripts/* deploy_package/scripts/
         cd deploy_package && zip -r ../deploy_package.zip .
