@@ -32,25 +32,6 @@ jobs:
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-    - name: Debug SSH Connection
-      env:
-        EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-        EC2_HOST: ${{ secrets.EC2_HOST }}
-        EC2_USER: ec2-user
-      run: |
-        echo "Debugging information:"
-        echo "EC2_USER: $EC2_USER"
-        echo "EC2_HOST: $EC2_HOST"
-        echo "Attempting to resolve hostname:"
-        nslookup $EC2_HOST || echo "nslookup failed"
-        echo "Attempting to ping host:"
-        ping -c 4 $EC2_HOST || echo "ping failed"
-        echo "Setting up SSH key:"
-        echo "$EC2_SSH_PRIVATE_KEY" > private_key
-        chmod 600 private_key
-        echo "Attempting SSH connection with verbose output:"
-        ssh -v -o StrictHostKeyChecking=no -i private_key ${EC2_USER}@${EC2_HOST} "echo SSH connection successful" || echo "SSH connection failed"
-
     - name: Deploy to EC2
       env:
         EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
@@ -62,11 +43,19 @@ jobs:
       run: |
         echo "$EC2_SSH_PRIVATE_KEY" > private_key
         chmod 600 private_key
+        scp -o StrictHostKeyChecking=no -i private_key docker-compose.yml ${EC2_USER}@${EC2_HOST}:~/docker-compose.yml
         ssh -o StrictHostKeyChecking=no -i private_key ${EC2_USER}@${EC2_HOST} '
+          sudo yum update -y
+          sudo amazon-linux-extras install docker -y
+          sudo service docker start
+          sudo usermod -a -G docker ec2-user
+          sudo chkconfig docker on
+          sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
           aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
-          docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
-          docker stop nest-app || true
-          docker rm nest-app || true
-          docker run -d --name nest-app -p 3000:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          echo "IMAGE_TAG=${{ github.sha }}" > .env
+          docker-compose down
+          docker-compose up -d
           docker image prune -f
+          sudo systemctl enable docker
         '
