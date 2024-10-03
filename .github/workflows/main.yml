@@ -3,7 +3,7 @@ name: Deploy NestJS Docker App to AWS EC2
 on:
   push:
     branches:
-      - '*'  # 모든 브랜치에 대해 실행
+      - *
 
 jobs:
   build-and-deploy:
@@ -33,14 +33,15 @@ jobs:
 
       - name: Deploy to EC2
         env:
-          PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          HOST: ${{ secrets.EC2_HOST }}
-          USER: ec2-user
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ec2-user
         run: |
-          echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
-          ssh -o StrictHostKeyChecking=no -i private_key ${USER}@${HOST} << 'EOF'
-            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
+          echo "$EC2_SSH_PRIVATE_KEY" > private_key
+          chmod 600 private_key
+          ssh -o StrictHostKeyChecking=no -i private_key ${EC2_USER}@${EC2_HOST} << EOF
+            docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
             docker stop nest-app || true
             docker rm nest-app || true
-            docker run -d --name nest-app -p 3000:3000 $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
-EOF
+            docker run -d --name nest-app -p 3000:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          EOF
