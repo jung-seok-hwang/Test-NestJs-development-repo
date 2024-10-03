@@ -3,7 +3,7 @@ name: Deploy NestJS Docker App to AWS EC2
 on:
   push:
     branches:
-      - *
+      - '*'  # 모든 브랜치에 대해 실행
 
 jobs:
   build-and-deploy:
