@@ -37,8 +37,8 @@ jobs:
         mkdir -p deploy_package
         cp appspec.yml deploy_package/
         cp docker-compose.yml deploy_package/
-        cp scripts/start_container.sh deploy_package/
-        cp scripts/stop_container.sh deploy_package/
+        mkdir -p deploy_package/scripts
+        cp scripts/* deploy_package/scripts/
         cd deploy_package && zip -r ../deploy_package.zip .
 
     - name: Deploy to AWS CodeDeploy
@@ -47,4 +47,5 @@ jobs:
           --application-name YourCodeDeployApplicationName \
           --deployment-group-name YourDeploymentGroupName \
           --deployment-config-name CodeDeployDefault.OneAtATime \
-          --s3-location bucket=YourS3BucketName,bundleType=zip,key=deploy_package.zip
+          --s3-location bucket=${{ secrets.S3_BUCKET }},bundleType=zip,key=deploy_package.zip \
+          --file-exists-behavior OVERWRITE
