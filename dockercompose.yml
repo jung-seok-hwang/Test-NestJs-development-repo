@@ -1,0 +1,6 @@
+services:
+  nest-app:
+    image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
+    ports:
+      - "3000:3000"
+    restart: always
