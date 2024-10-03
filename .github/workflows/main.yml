@@ -1,4 +1,4 @@
-name: Deploy to Amazon ECR and EC2 using CodeDeploy
+name: Deploy to Amazon ECR and EC2
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ap-northeast-2
-        
+
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
@@ -32,43 +32,44 @@ jobs:
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-    - name: Create appspec.yml
+    - name: Create docker-compose.yml
       run: |
-        cat > appspec.yml << EOL
-        version: 0.0
-        os: linux
-        files:
-          - source: /
-            destination: /var/www/nest-app
-        hooks:
-          BeforeInstall:
-            - location: scripts/stop_server.sh
-              timeout: 300
-              runas: root
-          AfterInstall:
-            - location: scripts/install_dependencies.sh
-              timeout: 300
-              runas: root
-          ApplicationStart:
-            - location: scripts/start_server.sh
-              timeout: 300
-              runas: root
-        EOL
+        echo "version: '3'
+        services:
+          nest-app:
+            image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${IMAGE_TAG}
+            ports:
+              - '3000:3000'
+            restart: always" > docker-compose.yml
 
-    - name: Create deployment package
+    - name: Deploy to EC2
+      env:
+        EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        EC2_HOST: ${{ secrets.EC2_HOST }}
+        EC2_USER: ec2-user
+        ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+        IMAGE_TAG: ${{ github.sha }}
       run: |
-        mkdir -p deploy_package
-        cp appspec.yml deploy_package/
-        cp docker-compose.yml deploy_package/
-        mkdir -p deploy_package/scripts
-        cp scripts/* deploy_package/scripts/
-        cd deploy_package && zip -r ../deploy_package.zip .
-
-    - name: Deploy to AWS CodeDeploy
-      run: |
-        aws deploy create-deployment \
-          --application-name YourCodeDeployApplicationName \
-          --deployment-group-name YourDeploymentGroupName \
-          --deployment-config-name CodeDeployDefault.OneAtATime \
-          --s3-location bucket=${{ secrets.S3_BUCKET }},bundleType=zip,key=deploy_package.zip \
-          --file-exists-behavior OVERWRITE
+        echo "$EC2_SSH_PRIVATE_KEY" > private_key
+        chmod 600 private_key
+        scp -o StrictHostKeyChecking=no -i private_key docker-compose.yml ${EC2_USER}@${EC2_HOST}:~/docker-compose.yml
+        ssh -o StrictHostKeyChecking=no -i private_key ${EC2_USER}@${EC2_HOST} '
+          sudo yum update -y
+          sudo amazon-linux-extras install docker -y
+          sudo service docker start
+          sudo usermod -a -G docker ec2-user
+          sudo chkconfig docker on
+          sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+          echo "IMAGE_TAG=${{ github.sha }}" > .env
+          docker-compose down
+          docker-compose up -d
+          docker image prune -f
+          # 로그 확인을 통해 실행 여부 확인
+          docker-compose logs -f
+          # 서비스 상태 확인
+          docker ps
+          sudo systemctl enable docker
+        '
