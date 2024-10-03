@@ -65,11 +65,10 @@ jobs:
           aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
           echo "IMAGE_TAG=${{ github.sha }}" > .env
           docker-compose down
+          docker-compose pull  # 새로운 이미지를 가져오기 위해 docker-compose pull 명령어 추가
           docker-compose up -d
+          docker-compose ps  # 현재 실행 중인 컨테이너 목록 확인
+          docker-compose logs -f  # 로그를 통해 실행 상태를 실시간으로 확인
           docker image prune -f
-          # 로그 확인을 통해 실행 여부 확인
-          docker-compose logs -f
-          # 서비스 상태 확인
-          docker ps
           sudo systemctl enable docker
         '
