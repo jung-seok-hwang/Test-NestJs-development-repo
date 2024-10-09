@@ -38,5 +38,5 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/hwangjungseok/nestjs-bapull
-            ${{ secrets.DOCKERHUB_USERNAME }}/hwangjungseok/nestjs-bapull:latest
+            ${{ secrets.DOCKER_USERNAME }}/hwangjungseok/nestjs-bapull
+            ${{ secrets.DOCKER_PASSWORD }}/hwangjungseok/nestjs-bapull:latest
