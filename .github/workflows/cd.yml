@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       EC2_IP: ${{ secrets.EC2_HOST }}
+      DOCKER_IMAGE: ${{ secrets.DOCKER_USERNAME }}/nestjs-bapull:latest
     steps:
       - name: Setup SSH Key and Scan EC2 Host
         run: |
@@ -22,12 +23,8 @@ jobs:
       - name: Execute Deployment Commands on EC2
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ env.EC2_IP }} "
-          docker pull ${{ secrets.DOCKER_USERNAME }}/nestjs-bapull:latest;
+          docker pull ${DOCKER_IMAGE};
           docker stop my-container || true;
           docker rm my-container || true;
-          IMAGE_ID=$(sudo docker images -q ${{ secrets.DOCKER_USERNAME }}/nestjs-bapull:latest | head -n 1);
-          if [ ! -z \"$IMAGE_ID\" ]; then
-            docker images -q | grep -v $IMAGE_ID | xargs -r sudo docker rmi;
-          fi;
-          docker run -d --name my-container -p 80:3000 ${{ secrets.DOCKER_USERNAME }}/nestjs-bapull:latest;
+          docker run -d --name my-container -p 80:3000 ${DOCKER_IMAGE};
           docker image prune -af"
