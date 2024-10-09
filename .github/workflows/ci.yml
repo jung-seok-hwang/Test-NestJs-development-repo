@@ -39,5 +39,5 @@ jobs:
           push: true
           no-cache: true
           tags: |
-            /hwangjungseok/nestjs-bapull
-            /hwangjungseok/nestjs-bapull:latest
+            hwangjungseok/nestjs-bapull
+            hwangjungseok/nestjs-bapull:latest
