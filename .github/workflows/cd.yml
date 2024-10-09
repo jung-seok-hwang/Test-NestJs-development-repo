@@ -23,7 +23,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ env.EC2_IP }} "
           docker pull hwangjungseok/nestjs-bapull:latest;
-          docker stop nestjs-bapull || true;
-          docker rm nestjs-bapull || true;
-          docker run -d --name nestjs-bapull -p 80:3000 hwangjungseok/nestjs-bapull:latest;
+          docker stop nestjs-bapull;
+          docker rm nestjs-bapull;
+          docker run -d --name nestjs-bapull -p 80:3000 --restart always hwangjungseok/nestjs-bapull:latest;
           docker image prune -af"
