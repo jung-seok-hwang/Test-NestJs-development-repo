@@ -22,12 +22,8 @@ jobs:
       - name: Execute Deployment Commands on EC2
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ env.EC2_IP }} "
-          docker pull ${{ secrets.DOCKER_USERNAME }}/nestjs-bapull:latest;
+          docker pull hwangjungseok/nestjs-bapull:latest;
           docker stop nestjs-bapull || true;
           docker rm nestjs-bapull || true;
-          IMAGE_ID=$(sudo docker images -q ${{ secrets.DOCKER_USERNAME }}/nestjs-bapull:latest | head -n 1);
-          if [ ! -z \"$IMAGE_ID\" ]; then
-            docker images -q | grep -v $IMAGE_ID | xargs -r sudo docker rmi;
-          fi;
-          docker run -d --name nestjs-bapull -p 80:3000 ${{ secrets.DOCKERHUB_USERNAME }}/nestjs-bapull:latest;
+          docker run -d --name nestjs-bapull -p 80:3000 hwangjungseok/nestjs-bapull:latest;
           docker image prune -af"
