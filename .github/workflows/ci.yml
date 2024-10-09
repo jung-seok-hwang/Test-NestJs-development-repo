@@ -1,9 +1,10 @@
 name: Docker Image CI
 
 on:
+  push:
+    branches: [ master ]  # main과 master 브랜치 모두에 대해 트리거
   pull_request:
-    branches:
-      - master
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
