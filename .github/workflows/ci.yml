@@ -1,16 +1,19 @@
 name: Docker Image CI
 
 on:
-  pull_request_target:
-    types: [closed] # プルリクエストがクローズされたときに実行
-    branches: [master]  # main ブランチに対してのみ実行
+  push:
+    branches:
+    - '*'
+  pull_request:
+    branches:
+    - '*'
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build
+    name: Build and Push to Docker Hub
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, '🆗 safe') && github.event.pull_request.merged == true # 「🆗 safe」 ラベルがあり、マージされたプルリクエストに対してのみ実行
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
 
     steps:
       - name: Checkout code
@@ -38,5 +41,5 @@ jobs:
           push: true
           no-cache: true
           tags: |
-            ghcr.io/hwangjungseok/nestjs-bapull
-            ghcr.io/hwangjungseok/nestjs-bapull:latest
+            hwangjungseok/nestjs-bapull
+            hwangjungseok/nestjs-bapull:latest
