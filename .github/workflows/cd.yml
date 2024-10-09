@@ -10,23 +10,24 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      EC2_IP: ${{ secrets.EC2_HOST }}
     steps:
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          script: |
-            # Docker Hub에서 이미지 풀
-            docker pull /hwangjungseok/nestjs-bapull:latest
-            
-            # 기존 컨테이너 중지 및 제거
-            docker stop my-container || true
-            docker rm my-container || true
-            
-            # 새 컨테이너 실행
-            docker run -d --name my-container -p 80:3000 /hwangjungseok/nestjs-bapull:latest
-            
-            # 사용하지 않는 이미지 정리
-            docker image prune -af
+      - name: Setup SSH Key and Scan EC2 Host
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.EC2_IP }} >> ~/.ssh/known_hosts
+      - name: Execute Deployment Commands on EC2
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ env.EC2_IP }} "
+          docker pull ${{ secrets.DOCKER_USERNAME }}/nestjs-bapull:latest;
+          docker stop my-container || true;
+          docker rm my-container || true;
+          IMAGE_ID=$(sudo docker images -q ${{ secrets.DOCKER_USERNAME }}/nestjs-bapull:latest | head -n 1);
+          if [ ! -z \"$IMAGE_ID\" ]; then
+            docker images -q | grep -v $IMAGE_ID | xargs -r sudo docker rmi;
+          fi;
+          docker run -d --name my-container -p 80:3000 ${{ secrets.DOCKER_USERNAME }}/nestjs-bapull:latest;
+          docker image prune -af"
