@@ -37,6 +37,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64
           push: true
+          no-cache: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/hwangjungseok/nestjs-bapull
-            ${{ secrets.DOCKER_PASSWORD }}/hwangjungseok/nestjs-bapull:latest
+            /hwangjungseok/nestjs-bapull
+            /hwangjungseok/nestjs-bapull:latest
