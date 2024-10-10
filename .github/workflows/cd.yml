@@ -28,5 +28,6 @@ jobs:
           IMAGE_ID=$(docker images -q hwangjungseok/nestjs-bapull:latest | head -n 1);
           if [ ! -z \"$IMAGE_ID\" ]; then
             docker images -q | grep -v $IMAGE_ID | xargs -r docker rmi;
+            docker images -f 'dangling=true' -q | xargs -r docker rmi;
           fi;
           docker run -d -p 3000:3000 --env-file /home/ubuntu/.env --restart always --name nestjs-bapull hwangjungseok/nestjs-bapull:latest"
