@@ -21,9 +21,16 @@ jobs:
           ssh-keyscan -H ${{ env.EC2_IP }} >> ~/.ssh/known_hosts
       - name: Execute Deployment Commands on EC2
         run: |
-          ssh -i ~/.ssh/id_rsa ec2-user@${{ env.EC2_IP }} "
-          sudo docker pull hwangjungseok/nestjs-bapull:latest;
-          sudo docker stop nestjs-bapull;
-          sudo docker rm nestjs-bapull;
-          sudo docker run -d --name nestjs-bapull -p 80:3000 --restart always hwangjungseok/nestjs-bapull:latest;
-          sudo docker image prune -af"
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ env.EC2_IP }} "
+          docker pull hwangjungseok/nestjs-bapull:latest;
+          docker stop nestjs-bapull || true;
+          docker rm nestjs-bapull || true;
+          IMAGE_ID=$(docker images -q hwangjungseok/nestjs-bapull:latest | head -n 1);
+          if [ ! -z \"$IMAGE_ID\" ]; then
+            docker images -q | grep -v $IMAGE_ID | xargs -r docker rmi;
+          fi;
+          docker run -d -p 3000:3000 --env-file /path/to/.env --restart always --name nestjs-bapull hwangjungseok/nestjs-bapull:latest"
+      # - name: Verify Nginx Configuration
+      #   run: |
+      #     ssh -i ~/.ssh/id_rsa ubuntu@${{ env.EC2_IP }} "
+      #     sudo nginx -t && sudo systemctl reload nginx"
