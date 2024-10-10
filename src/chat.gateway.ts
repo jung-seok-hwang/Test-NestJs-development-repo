@@ -18,7 +18,13 @@ interface Room {
   users: User[];
 }
 
-@WebSocketGateway({ path: '/ws-stomp', cors: { origin: '*' } })
+@WebSocketGateway({
+  cors: {
+    origin: 'http://13.125.147.248:3000',
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+})
 export class ChatGateway {
   @WebSocketServer()
   server: Server;
