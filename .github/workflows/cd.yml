@@ -23,14 +23,10 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_rsa ubuntu@${{ env.EC2_IP }} "
           docker pull hwangjungseok/nestjs-bapull:latest;
-          docker stop nestjs-bapull || true;
-          docker rm nestjs-bapull || true;
+          docker stop nestjs-bapull;
+          docker rm nestjs-bapull;
           IMAGE_ID=$(docker images -q hwangjungseok/nestjs-bapull:latest | head -n 1);
           if [ ! -z \"$IMAGE_ID\" ]; then
             docker images -q | grep -v $IMAGE_ID | xargs -r docker rmi;
           fi;
-          docker run -d -p 3000:3000 --env-file /path/to/.env --restart always --name nestjs-bapull hwangjungseok/nestjs-bapull:latest"
-      # - name: Verify Nginx Configuration
-      #   run: |
-      #     ssh -i ~/.ssh/id_rsa ubuntu@${{ env.EC2_IP }} "
-      #     sudo nginx -t && sudo systemctl reload nginx"
+          docker run -d -p 3000:3000 --env-file /home/ubuntu/.env --restart always --name nestjs-bapull hwangjungseok/nestjs-bapull:latest"
