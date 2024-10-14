@@ -21,28 +21,28 @@ export class ChatGateway implements OnGatewayDisconnect {
   server: Server;
 
   @SubscribeMessage('getRooms')
-  handleGetRooms(): any {
+  async handleGetRooms(): Promise<any> {
     return this.chatService.getRooms();
   }
 
   @SubscribeMessage('createRoom')
-  handleCreateRoom(
-    @MessageBody() data: { name: string; roomName: string },
+  async handleCreateRoom(
+    @MessageBody() data: { name: string; roomName: string; expiresIn: number },
     @ConnectedSocket() client: Socket,
-  ): void {
-    const room = this.chatService.createRoom(data.name, data.roomName, client.id);
+  ): Promise<void> {
+    const room = await this.chatService.createRoom(data.name, data.roomName, client.id, data.expiresIn);
     client.join(room.id);
     client.emit('joinedRoom', { roomId: room.id, roomName: room.name });
-    this.server.emit('roomList', this.chatService.getRooms());
+    this.server.emit('roomList', await this.chatService.getRooms());
     this.server.to(room.id).emit('userJoined', { user: data.name, roomName: room.name });
   }
 
   @SubscribeMessage('joinRoom')
-  handleJoinRoom(
+  async handleJoinRoom(
     @MessageBody() data: { name: string; roomId: string },
     @ConnectedSocket() client: Socket,
-  ): void {
-    const room = this.chatService.joinRoom(data.name, data.roomId, client.id);
+  ): Promise<void> {
+    const room = await this.chatService.joinRoom(data.name, data.roomId, client.id);
     if (room) {
       client.join(room.id);
       client.emit('joinedRoom', { roomId: room.id, roomName: room.name });
@@ -76,7 +76,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     if (result) {
       this.server.to(result.roomId).emit('userLeft', { user: result.userName, roomName: result.roomName });
       client.leave(result.roomId);
-      this.server.emit('roomList', this.chatService.getRooms());
+      this.server.emit('roomList', await this.chatService.getRooms());
     }
   }
 

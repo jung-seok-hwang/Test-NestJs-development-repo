@@ -2,60 +2,58 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Message, MessageDocument } from './message.schema';
+import { Room, RoomDocument } from './room.schema';
 
 interface User {
   id: string;
   name: string;
 }
 
-interface Room {
-  id: string;
-  name: string;
-  users: User[];
-}
-
 @Injectable()
 export class ChatService {
   private users: User[] = [];
-  private rooms: Room[] = [];
 
-  constructor(@InjectModel(Message.name) private messageModel: Model<MessageDocument>) {
-    // 초기 사용자 두 명 추가
-    this.users.push(
-      { id: '1', name: '사용자1' },
-      { id: '2', name: '사용자2' }
-    );
+  constructor(
+    @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
+    @InjectModel(Room.name) private roomModel: Model<RoomDocument>
+  ) {}
+
+  async getRooms(): Promise<Room[]> {
+    return this.roomModel.find({ expiresAt: { $gt: new Date() } }).exec();
   }
 
-  getRooms(): any {
-    return this.rooms.map(room => ({ id: room.id, name: room.name, users: room.users }));
-  }
-
-  createRoom(name: string, roomName: string, clientId: string): Room {
+  async createRoom(name: string, roomName: string, clientId: string, expiresIn: number): Promise<RoomDocument> {
     const user: User = { id: clientId, name };
     this.users.push(user);
 
-    const room: Room = { id: Date.now().toString(), name: roomName, users: [user] };
-    this.rooms.push(room);
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + expiresIn);
 
-    return room;
+    const room = new this.roomModel({
+      name: roomName,
+      users: [user],
+      createdAt: new Date(),
+      expiresAt: expiresAt,
+    });
+
+    return room.save();
   }
 
-  joinRoom(name: string, roomId: string, clientId: string): Room | null {
+  async joinRoom(name: string, roomId: string, clientId: string): Promise<RoomDocument | null> {
     const user: User = { id: clientId, name };
     this.users.push(user);
 
-    const room = this.rooms.find(r => r.id === roomId);
+    const room = await this.roomModel.findById(roomId);
     if (room) {
       room.users.push(user);
-      return room;
+      return room.save();
     }
     return null;
   }
 
   async saveMessage(clientId: string, message: string): Promise<any | null> {
     const user = this.users.find(u => u.id === clientId);
-    const room = this.rooms.find(r => r.users.some(u => u.id === clientId));
+    const room = await this.roomModel.findOne({ 'users.id': clientId });
     
     if (user && room) {
       const timestamp = new Date();
@@ -84,16 +82,18 @@ export class ChatService {
 
   async leaveRoom(clientId: string): Promise<{ roomId: string; userName: string; roomName: string } | null> {
     const user = this.users.find(u => u.id === clientId);
-    const room = this.rooms.find(r => r.users.some(u => u.id === clientId));
+    const room = await this.roomModel.findOne({ 'users.id': clientId });
     
     if (user && room) {
       await this.saveChatHistory(room.id);
 
       room.users = room.users.filter(u => u.id !== clientId);
+      await room.save();
+
       this.users = this.users.filter(u => u.id !== clientId);
       
       if (room.users.length === 0) {
-        this.rooms = this.rooms.filter(r => r.id !== room.id);
+        await this.roomModel.findByIdAndDelete(room.id);
       }
 
       return {
@@ -121,5 +121,9 @@ export class ChatService {
     } catch (error) {
       console.error('Error saving chat history:', error);
     }
+  }
+
+  async cleanExpiredRooms(): Promise<void> {
+    await this.roomModel.deleteMany({ expiresAt: { $lte: new Date() } });
   }
 }
