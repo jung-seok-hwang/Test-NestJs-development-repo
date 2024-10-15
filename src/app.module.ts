@@ -1,10 +1,20 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';  // 이 줄을 추가하세요
+import { MongooseModule } from '@nestjs/mongoose';
 import { ChatGateway } from './chat.gateway';
+import { ChatService } from './chat.service';
+import { Message, MessageSchema } from './message.schema';
+import { Room, RoomSchema } from './room.schema';
+import { AppController } from './app.controller';
 
 @Module({
-  imports: [],
-  controllers: [AppController],  // AppController를 여기에 추가하세요
-  providers: [ChatGateway],
+  imports: [
+    MongooseModule.forRoot('mongodb://localhost:27017/your_database_name'),
+    MongooseModule.forFeature([
+      { name: Message.name, schema: MessageSchema },
+      { name: Room.name, schema: RoomSchema }
+    ]),
+  ],
+  controllers: [AppController],
+  providers: [ChatGateway, ChatService],
 })
 export class AppModule {}
