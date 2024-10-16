@@ -34,6 +34,6 @@ jobs:
           ECR_REPOSITORY: react-bapull
           IMAGE_TAG: latest
         run: |
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker build -t react-bapull .
+          docker tag react-bapull:latest 942414443589.dkr.ecr.ap-northeast-2.amazonaws.com/react-bapull:latest
+          docker push 942414443589.dkr.ecr.ap-northeast-2.amazonaws.com/react-bapull:latest
