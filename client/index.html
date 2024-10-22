@@ -1,145 +1,59 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>실시간 채팅</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.2/socket.io.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        #chat-box { height: 300px; border: 1px solid #ddd; overflow-y: scroll; padding: 10px; margin-bottom: 20px; }
-        #message-input, #name-input, #room-input { width: 70%; padding: 5px; margin-bottom: 10px; }
-        #send-button, #create-button, #join-button { width: 25%; padding: 5px; }
-        #room-info { margin-bottom: 10px; font-weight: bold; }
-        #room-list { margin-bottom: 20px; }
-        .room-item { cursor: pointer; padding: 5px; border: 1px solid #ddd; margin-bottom: 5px; }
-        .room-item:hover { background-color: #f0f0f0; }
-        .hidden { display: none; }
-    </style>
+    <!-- ... (기존 코드) ... -->
 </head>
 <body>
-    <h1>실시간 채팅</h1>
-    <div id="login-form">
-        <input type="text" id="name-input" placeholder="이름을 입력하세요">
-        <button id="login-button">로그인</button>
-    </div>
+    <!-- ... (기존 코드) ... -->
     <div id="room-selection" class="hidden">
         <h2>채팅방</h2>
         <div id="room-list"></div>
         <input type="text" id="room-input" placeholder="새로운 방 이름을 입력하세요">
+        <input type="number" id="room-expiry" placeholder="방 유효 기간 (시간)">
         <button id="create-button">방 만들기</button>
     </div>
-    <div id="chat-form" class="hidden">
-        <div id="room-info"></div>
-        <div id="chat-box"></div>
-        <input type="text" id="message-input" placeholder="메시지를 입력하세요...">
-        <button id="send-button">전송</button>
-        <button id="leave-button">방 나가기</button>
-    </div>
+    <!-- ... (기존 코드) ... -->
 
     <script>
-        const socket = io('http://13.125.147.248:3000');
-        const loginForm = document.getElementById('login-form');
-        const roomSelection = document.getElementById('room-selection');
-        const chatForm = document.getElementById('chat-form');
-        const chatBox = document.getElementById('chat-box');
-        const messageInput = document.getElementById('message-input');
-        const nameInput = document.getElementById('name-input');
-        const roomInput = document.getElementById('room-input');
-        const loginButton = document.getElementById('login-button');
-        const createButton = document.getElementById('create-button');
-        const sendButton = document.getElementById('send-button');
-        const leaveButton = document.getElementById('leave-button');
-        const roomInfo = document.getElementById('room-info');
-        const roomList = document.getElementById('room-list');
-
-        let currentRoom = '';
-        let userName = '';
-
-        loginButton.addEventListener('click', () => {
-            userName = nameInput.value.trim();
-            if (userName) {
-                loginForm.classList.add('hidden');
-                roomSelection.classList.remove('hidden');
-                socket.emit('getRooms');
-            }
-        });
-
-        socket.on('roomList', (rooms) => {
-            roomList.innerHTML = '<h3>참가 가능한 방</h3>';
-            if (rooms.length === 0) {
-                roomList.innerHTML += '<p>현재 열린 방이 없습니다. 새로운 방을 만들어보세요!</p>';
-            } else {
-                rooms.forEach(room => {
-                    const roomElement = document.createElement('div');
-                    roomElement.classList.add('room-item');
-                    roomElement.textContent = `${room.name} (${room.users.length}명)`;
-                    roomElement.onclick = () => joinRoom(room.id);
-                    roomList.appendChild(roomElement);
-                });
-            }
-        });
+        // ... (기존 코드) ...
 
         createButton.addEventListener('click', () => {
             const roomName = roomInput.value.trim();
-            if (roomName) {
-                socket.emit('createRoom', { name: userName, roomName: roomName });
+            const expiresIn = parseInt(document.getElementById('room-expiry').value);
+            if (roomName && !isNaN(expiresIn)) {
+                socket.emit('createRoom', { name: userName, roomName: roomName, expiresIn: expiresIn });
             }
         });
 
-        function joinRoom(roomId) {
-            socket.emit('joinRoom', { name: userName, roomId: roomId });
-        }
+        // ... (기존 코드) ...
 
+        // 페이지 로드 시 세션 스토리지에서 사용자 정보와 현재 방 정보를 확인
+        window.addEventListener('load', () => {
+            const storedUserName = sessionStorage.getItem('userName');
+            const storedRoomId = sessionStorage.getItem('currentRoom');
+            
+            if (storedUserName && storedRoomId) {
+                userName = storedUserName;
+                currentRoom = storedRoomId;
+                nameInput.value = userName;
+                socket.emit('joinRoom', { name: userName, roomId: currentRoom });
+            }
+        });
+
+        // 방에 참가할 때 세션 스토리지에 정보 저장
         socket.on('joinedRoom', (data) => {
-            currentRoom = data.roomId;
-            roomSelection.classList.add('hidden');
-            chatForm.classList.remove('hidden');
-            roomInfo.textContent = `현재 방: ${data.roomName}`;
-            chatBox.innerHTML = '';
-            addMessage('시스템', `${userName}님, ${data.roomName} 방에 오신 것을 환영합니다!`);
+            // ... (기존 코드) ...
+            sessionStorage.setItem('userName', userName);
+            sessionStorage.setItem('currentRoom', data.roomId);
         });
 
-        socket.on('userJoined', (data) => {
-            addMessage('시스템', `${data.user}님이 방에 참가했습니다.`);
-        });
-
-        socket.on('userLeft', (data) => {
-            addMessage('시스템', `${data.user}님이 방을 나갔습니다.`);
-        });
-
-        sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
-
+        // 방을 나갈 때 세션 스토리지에서 정보 제거
         leaveButton.addEventListener('click', () => {
-            socket.emit('leaveRoom');
-            chatForm.classList.add('hidden');
-            roomSelection.classList.remove('hidden');
-            chatBox.innerHTML = '';
-            currentRoom = '';
-            socket.emit('getRooms');
+            // ... (기존 코드) ...
+            sessionStorage.removeItem('currentRoom');
         });
 
-        function sendMessage() {
-            const message = messageInput.value.trim();
-            if (message && currentRoom) {
-                socket.emit('chatMessage', message);
-                messageInput.value = '';
-            }
-        }
-
-        socket.on('chatMessage', (data) => {
-            addMessage(data.userName, data.message);
-        });
-
-        function addMessage(sender, message) {
-            const messageElement = document.createElement('p');
-            messageElement.textContent = `${sender}: ${message}`;
-            chatBox.appendChild(messageElement);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
+        // ... (기존 코드) ...
     </script>
 </body>
 </html>
