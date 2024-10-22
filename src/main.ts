@@ -5,7 +5,19 @@ import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  
+  // CORS 설정
+  app.enableCors({
+    origin: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
+  });
+
+  // static 파일 서빙
   app.useStaticAssets(join(__dirname, '..', 'public'));
+
   await app.listen(3000);
+  
+  console.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();

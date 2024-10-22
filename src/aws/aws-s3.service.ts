@@ -1,8 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { S3 } from 'aws-sdk';
-import { ManagedUpload } from 'aws-sdk/clients/s3';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
-import * as path from 'path';
 import { AwsS3Config } from './config/aws-s3.config';
 import { MultipartFile } from './interfaces/multipart-file.interface';
 import { FileInfo } from './interfaces/file-info.interface';
@@ -10,28 +8,29 @@ import { S3File } from './interfaces/s3-file.interface';
 
 @Injectable()
 export class AwsS3Service {
-  private readonly s3: S3;
+  private readonly s3Client: S3Client;
   private readonly logger = new Logger(AwsS3Service.name);
 
   constructor(private readonly config: AwsS3Config) {
-    this.s3 = new S3({
+    this.logger.log(`Initializing S3 client with bucket: ${this.config.s3.bucketName}`);
+
+    this.s3Client = new S3Client({
+      region: this.config.s3.region,
       credentials: {
         accessKeyId: this.config.credentials.accessKeyId,
         secretAccessKey: this.config.credentials.secretAccessKey,
       },
-      region: this.config.s3.region,
     });
   }
 
   async uploadFiles(entityId: number, entityType: string, files: MultipartFile[]): Promise<S3File> {
-    const fileInfos: FileInfo[] = [];
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const keyName = this.generateFileName(entityType, entityId, file.originalname);
-      const uploadResult = await this.uploadToBucket(file, keyName);
-      fileInfos.push(this.createFileInfo(i + 1, keyName, uploadResult.Location));
-    }
+    const fileInfos = await Promise.all(
+      files.map(async (file, index) => {
+        const keyName = this.generateFileName(file.originalname);
+        const uploadResult = await this.uploadToBucket(file, keyName);
+        return this.createFileInfo(index + 1, keyName, uploadResult);
+      }),
+    );
 
     return {
       id: Date.now(),
@@ -45,74 +44,59 @@ export class AwsS3Service {
 
   async saveFile(id: number, file: MultipartFile): Promise<string> {
     if (!file) {
-      throw new Error('File not found');
+      throw new BadRequestException('File not found');
     }
 
-    const keyName = this.generateFileName('notice', id, file.originalname);
-    const uploadResult = await this.uploadToBucket(file, keyName);
-    return uploadResult.Location;
+    const keyName = this.generateFileName(file.originalname);
+    return this.uploadToBucket(file, keyName);
   }
 
-  async updateFile(
-    entityId: number,
-    entityType: string,
-    seq: number,
-    file: MultipartFile,
-  ): Promise<FileInfo> {
-    const keyName = this.generateFileName(entityType, entityId, file.originalname);
-    const uploadResult = await this.uploadToBucket(file, keyName);
-    return this.createFileInfo(seq, keyName, uploadResult.Location);
+  private async uploadToBucket(file: MultipartFile, keyName: string): Promise<string> {
+    const fullKeyName = `incorrect-notes/${keyName}`;
+
+    try {
+      const params = {
+        Bucket: this.config.s3.bucketName,
+        Key: fullKeyName,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      };
+
+      const command = new PutObjectCommand(params);
+      await this.s3Client.send(command);
+
+      return `https://${this.config.s3.bucketName}.s3.${this.config.s3.region}.amazonaws.com/${fullKeyName}`;
+    } catch (error) {
+      this.logger.error(`[AwsS3Service.uploadToBucket] Failed to upload file: ${fullKeyName}`, error);
+      throw error;
+    }
   }
 
   async deleteFile(keyName: string): Promise<void> {
-    const params: S3.DeleteObjectRequest = {
+    const fullKeyName = `incorrect-notes/${keyName}`;
+    const params = {
       Bucket: this.config.s3.bucketName,
-      Key: keyName,
+      Key: fullKeyName,
     };
 
     try {
-      await this.s3.deleteObject(params).promise();
+      await this.s3Client.send(new DeleteObjectCommand(params));
     } catch (error) {
-      this.logger.error(`[AwsS3Service.deleteFile] Failed to delete file: ${keyName}`, error);
+      this.logger.error(`[AwsS3Service.deleteFile] Failed to delete file: ${fullKeyName}`, error);
       throw error;
     }
   }
 
-  private async uploadToBucket(
-    file: MultipartFile,
-    keyName: string,
-  ): Promise<ManagedUpload.SendData> {
-    const params: S3.PutObjectRequest = {
-      Bucket: this.config.s3.bucketName,
-      Key: keyName,
-      Body: file.buffer,
-      ContentType: file.mimetype,
-      ACL: 'public-read',
-    };
-
-    try {
-      return await this.s3.upload(params).promise();
-    } catch (error) {
-      this.logger.error(`[AwsS3Service.uploadToBucket] Failed to upload file: ${keyName}`, error);
-      throw error;
-    }
+  private generateFileName(originalFileName: string): string {
+    const uniqueFileName = `${uuidv4()}_${this.sanitizeFileName(originalFileName)}`;
+    return uniqueFileName;
   }
 
-  private generateFileName(
-    entityType: string,
-    entityId: number,
-    originalFileName: string,
-  ): string {
-    const folderName = this.createFolderNameWithTodayDate();
-    const uniqueFileName = `${entityType}/${entityId}/${uuidv4()}_${originalFileName}`;
-    return path.join(folderName, uniqueFileName);
-  }
-
-  private createFolderNameWithTodayDate(): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    return `${year}/${month}`;
+  private sanitizeFileName(fileName: string): string {
+    return Buffer.from(fileName, 'latin1')
+      .toString('utf8')
+      .replace(/[^a-zA-Z0-9가-힣._-]/g, '')
+      .replace(/\s+/g, '_');
   }
 
   private createFileInfo(seq: number, keyName: string, path: string): FileInfo {

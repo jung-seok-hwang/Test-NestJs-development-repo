@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { AppController } from './app.controller';
+import { AwsS3Module } from './aws/aws-s3.module';
 import { ChatGateway } from './chat/chat.gateway';
-import { ChatService } from './chat/chat.service';  // 경로 확인
+import { ChatService } from './chat/chat.service';
 import { Message, MessageSchema } from './chat/message.schema';
 import { Room, RoomSchema } from './chat/room.schema';
 
@@ -16,7 +18,9 @@ import { Room, RoomSchema } from './chat/room.schema';
       { name: Message.name, schema: MessageSchema },
       { name: Room.name, schema: RoomSchema },
     ]),
+    AwsS3Module,
   ],
-  providers: [ChatGateway, ChatService],  // ChatService를 providers에 추가
+  controllers: [AppController],
+  providers: [ChatGateway, ChatService],
 })
 export class AppModule {}
